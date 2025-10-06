@@ -1,0 +1,64 @@
+module disease_display (
+    input        clk,    // Clock input
+    input        rst,    // Reset input
+    output [7:0] char_out, // 8-bit output for the character to display
+    output reg [7:0] disease // Register to store the detected disease name (one character at a time)
+);
+
+    // Parameters for memory size
+    integer i;
+    integer mem_file;
+    reg [7:0] mem [0:255]; // Memory array to hold binary values (max 256 characters)
+
+    // Register to track the position of the character in the .mem file
+    reg [7:0] index;
+
+    initial begin
+        // Initialize the index to 0
+        index = 0;
+
+        // Open the .mem file containing the disease name in binary
+        mem_file = $fopen("detected_disease.mem", "r");
+        if (mem_file == 0) begin
+            $display("Error: Could not open .mem file.");
+            $finish;
+        end
+
+        // Read the .mem file into the memory array
+        for (i = 0; i < 256; i = i + 1) begin
+            if ($fscanf(mem_file, "%b\n", mem[i]) == 0) begin
+                $display("Error: Unable to read data from the .mem file.");
+                $finish;
+            end
+        end
+
+        // Close the file after reading
+        $fclose(mem_file);
+    end
+
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            // Reset logic: Reset the index and disease character
+            index   <= 0;
+            disease <= 8'b0;
+        end else begin
+            // Output the current character from memory
+            disease <= mem[index];
+
+            // Display the detected character for the disease (for debugging)
+            $display("Detected character: %c", mem[index]);
+
+            // If the character has been displayed, move to the next one
+            if (index < 255) begin
+                index <= index + 1;
+            end else begin
+                // If we have reached the end of the disease name, loop back
+                index <= 0;
+            end
+        end
+    end
+
+    // Output the current character to be displayed
+    assign char_out = disease;
+
+endmodule
