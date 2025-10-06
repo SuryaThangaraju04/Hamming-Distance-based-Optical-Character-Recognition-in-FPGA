@@ -1,0 +1,58 @@
+% MATLAB: Convert OCR text (disease name) to a .mem file of 8-bit binary rows
+
+% Step 1: Read the image (change the path if needed)
+img = imread('prescription.jpg');  % <-- update to your image path if needed
+
+% (Optional but helpful) Basic pre-processing for better OCR
+% img = rgb2gray(img);
+% img = imbinarize(img);
+
+% Step 2: Perform OCR on the image to extract text
+ocrResult = ocr(img);
+
+% Step 3: Extract the disease name (pick the first non-empty line)
+rawText = strtrim(ocrResult.Text);
+lines = regexp(rawText, '\r?\n', 'split');
+lines = cellfun(@strtrim, lines, 'UniformOutput', false);
+nonEmptyIdx = find(~cellfun(@isempty, lines), 1, 'first');
+
+if isempty(nonEmptyIdx)
+    error('Could not detect disease name. Please ensure the image is clear and contains only the disease name.');
+end
+
+disease = lines{nonEmptyIdx};  % assume this line is the disease name
+
+% Clean to ASCII printable range (optional: keep letters, digits, space, hyphen)
+disease = regexprep(disease, '[^A-Za-z0-9 \-]', '');
+
+% Step 4: Validate non-empty after cleaning
+if isempty(strtrim(disease))
+    error('Detected text is empty after cleaning. Please use a clearer image with only the disease name.');
+end
+
+% Step 5: Convert the disease name into binary (8-bit per character)
+bytes = uint8(disease);        % ASCII bytes
+nChars = numel(bytes);
+
+% Step 6: Save into a .mem file (exactly 256 lines expected by your Verilog)
+memFile = 'detected_disease.mem';
+fileID = fopen(memFile, 'w');
+if fileID == -1
+    error('Could not open %s for writing.', memFile);
+end
+
+% Write one 8-bit binary string per line for each character
+for i = 1:nChars
+    fprintf(fileID, '%s\n', dec2bin(bytes(i), 8));
+end
+
+% Pad remaining lines with zeros to reach 256 lines (your Verilog reads 256 rows)
+TOTAL_LINES = 256;
+for i = (nChars + 1):TOTAL_LINES
+    fprintf(fileID, '00000000\n');
+end
+
+fclose(fileID);
+
+% Display confirmation
+disp(['Disease information saved in: ', memFile]);
